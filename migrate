@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Usage
+#    export GH_USERNAME=xtoddx
+#    export GH_PASSWORD=XXX
+#    export GH_OTP=XXX or GH_TOKEN=XXX
+#    export AWS_PROFILE=XXX (defaults to "default")
+#    ./migrate ORG/REPO
+
+set -ex
+
+if [ -z "$GH_TOKEN"  ] && [ ! -z "$GH_OTP" ] ; then
+    GH_TOKEN=`curl --user ${GH_USERNAME}:${GH_PASSWORD} --header "X-GitHub-OTP: ${GH_OTP}" --header "Content-Type: application-json" -X POST --data '{"scopes": ["repo"], "note": "CC-Migrate"}' https://api.github.com/authorizations |
+        grep "\"token\": " |
+        awk -F': ' '{print $2}' |
+        sed -e s/[\",]//g`
+fi
+
+[ ! -z "$GH_TOKEN" ]
+
+if [ -z "$AWS_PROFILE" ] ; then AWS_PROFILE=default ; fi
+
+dirname=`basename -s .git ${1}`
+orgname=`dirname ${1}`
+aws codecommit create-repository --repository-name ${dirname}
+git clone git@github.com:${orgname}/${dirname}.git
+cd ${dirname}
+git remote add aws \
+               ssh://git-codecommit.us-east-1.amazonaws.com/v1/repos/${dirname}
+git push aws master
+git branch -r --merged |
+    grep -v master |
+    awk -F/ '{print ":"$2}' |
+    xargs -n 1 git push -q origin
+
+for x in `git branch -r | grep -v master | awk -F/ '{print $2}'` ; do
+    git checkout -q $x
+    git push -q aws $x
+done
+git checkout master
+
+curl --header "Authorization: token ${GH_TOKEN}" https://api.github.com/repos/${orgname}/${dirname}/issues > gh-issues.json
+curl --header "Authorization: token ${GH_TOKEN}" https://api.github.com/repos/${orgname}/${dirname}/pulls > gh-pull-requests.json
+
+git add gh-pull-requests.json gh-issues.json
+git commit -m "backup github data"
+git push aws
