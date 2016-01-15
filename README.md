@@ -45,6 +45,8 @@ Otherwise, you can create your own OAuth token and pass it in as `GH_TOKEN`.
 The script doesn't delete the repository from Github.
 Take a moment and say your goodbyes.
 
+Also delete the [OAuth Token][tokens] (named CC-Migrate) that was created.
+
 # License
 
 MIT. Contributions welcome.
@@ -53,3 +55,4 @@ MIT. Contributions welcome.
 [codecommit]: https://aws.amazon.com/codecommit/
 [cli]: https://github.com/aws/aws-cli
 [tfa]: https://help.github.com/articles/about-two-factor-authentication/
+[tokens]: https://github.com/settings/tokens
